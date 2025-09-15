@@ -13,7 +13,10 @@ body, html {
     left: 50%;
     transform: translateX(-50%);
     z-index: 2000;
-    width: 450px;
+    width: 450px; /* Largura máxima */
+    max-width: 95%; /* Garante que não ultrapasse a tela */
+    display: flex;
+    justify-content: center;
 }
 #guess-input {
     padding: 10px 15px;
@@ -23,25 +26,22 @@ body, html {
     width: 300px;
     transition: border-color 0.3s;
 }
-/* COR MODIFICADA */
 #guess-input:focus {
     outline: none;
-    border-color: #FF6700; /* Laranja no contorno */
+    border-color: #FF6700;
 }
-/* COR MODIFICADA */
 #guess-button {
     padding: 10px 20px;
     border: none;
-    background-color: #FF6700; /* Laranja no botão */
+    background-color: #FF6700;
     color: white;
     font-size: 16px;
     border-radius: 20px;
     cursor: pointer;
     transition: background-color 0.3s;
 }
-/* COR MODIFICADA (para um laranja mais escuro) */
 #guess-button:hover {
-    background-color: #E65C00; 
+    background-color: #E65C00;
 }
 #guess-input.shake {
     animation: shake 0.5s;
@@ -51,8 +51,10 @@ body, html {
     position: absolute;
     bottom: 100%;
     margin-bottom: 8px;
-    left: 0;
-    width: 334px;
+    left: 50%; /* Centraliza o container */
+    transform: translateX(-50%); /* Centraliza o container */
+    width: 80%; /* Largura relativa */
+    max-width: 334px; /* Largura máxima */
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -102,15 +104,16 @@ body, html {
     transform: scale(1);
     transition: transform 0.3s ease-in-out;
     pointer-events: auto;
+    width: 80%;
+    max-width: 300px;
 }
 #victory-popup.hidden .popup-content {
     transform: scale(0.8);
 }
-/* COR MODIFICADA */
 #restart-button {
     padding: 12px 25px;
     border: none;
-    background-color: #FF6700; /* Laranja no botão de reiniciar */
+    background-color: #FF6700;
     color: white;
     font-size: 16px;
     font-weight: bold;
@@ -119,7 +122,6 @@ body, html {
     margin-top: 10px;
     transition: background-color 0.3s;
 }
-/* COR MODIFICADA (para um laranja mais escuro) */
 #restart-button:hover {
     background-color: #E65C00;
 }
@@ -129,6 +131,7 @@ body, html {
     cursor: grab; user-select: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     white-space: nowrap; transition: transform 0.1s ease-out, background-color 0.3s;
     text-align: center;
+    font-size: 14px; /* Tamanho base da fonte */
 }
 .box-producao {
     background-color: #ffffff;
@@ -161,4 +164,42 @@ body, html {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
+}
+
+/* --- ESTILOS PARA DISPOSITIVOS MÓVEIS --- */
+@media (max-width: 768px) {
+    #ui-container {
+        width: 100%;
+        bottom: 15px;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    #guess-input {
+        width: 80%;
+        font-size: 14px;
+    }
+    #guess-button {
+        width: 60%;
+        padding: 12px;
+    }
+    #suggestions-container {
+        width: 85%;
+    }
+    .box-nome {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+    #victory-popup {
+        justify-content: center; /* Centraliza o popup no mobile */
+        align-items: center;
+        padding-right: 0;
+        background-color: rgba(0, 0, 0, 0.6); /* Readiciona o fundo escuro */
+    }
+    .popup-content h2 {
+        font-size: 20px;
+    }
+    .popup-content p {
+        font-size: 14px;
+    }
 }

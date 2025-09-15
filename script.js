@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestionsContainer = document.getElementById('suggestions-container');
     const victoryPopup = document.getElementById('victory-popup');
     const restartButton = document.getElementById('restart-button');
+    // --- NOVO ELEMENTO REFERENCIADO ---
+    const uiContainer = document.getElementById('ui-container');
     
     const nodesNaTela = new Set();
     const atorParaProducoes = new Map();
@@ -43,33 +45,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function verificarVitoria() {
         if (!atorObjetivo1 || !atorObjetivo2) return;
-
         const adjacencias = new Map();
         document.querySelectorAll('.box-nome').forEach(box => {
             adjacencias.set(box.dataset.nome, []);
         });
-
         document.querySelectorAll('#container-linhas line').forEach(linha => {
             const deNome = document.getElementById(linha.dataset.de).dataset.nome;
             const paraNome = document.getElementById(linha.dataset.para).dataset.nome;
             adjacencias.get(deNome).push(paraNome);
             adjacencias.get(paraNome).push(deNome);
         });
-
         const visitados = new Set();
-        const fila = [[atorObjetivo1, [atorObjetivo1]]]; // A fila agora guarda [nó, caminho]
+        const fila = [[atorObjetivo1, [atorObjetivo1]]];
         visitados.add(atorObjetivo1);
-
         while (fila.length > 0) {
             const [noAtual, caminho] = fila.shift();
-
             if (noAtual === atorObjetivo2) {
-                // Caminho encontrado!
                 destacarCaminhoVitoria(caminho);
                 victoryPopup.classList.remove('hidden');
                 return;
             }
-
             const vizinhos = adjacencias.get(noAtual) || [];
             for (const vizinho of vizinhos) {
                 if (!visitados.has(vizinho)) {
@@ -85,16 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < caminho.length - 1; i++) {
             const noA_nome = caminho[i];
             const noB_nome = caminho[i+1];
-
             const noA_id = document.querySelector(`[data-nome="${noA_nome}"]`).id;
             const noB_id = document.querySelector(`[data-nome="${noB_nome}"]`).id;
-
-            // Procura a linha que conecta os dois nós, em qualquer direção
-            const linha = document.querySelector(
-                `[data-de="${noA_id}"][data-para="${noB_id}"], 
-                 [data-de="${noB_id}"][data-para="${noA_id}"]`
-            );
-
+            const linha = document.querySelector(`[data-de="${noA_id}"][data-para="${noB_id}"], [data-de="${noB_id}"][data-para="${noA_id}"]`);
             if (linha) {
                 linha.classList.add('winning-path');
             }
@@ -105,50 +93,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const textoInput = guessInput.value.trim();
         const textoInputLower = textoInput.toLowerCase();
         if (!textoInput) return;
-
         guessInput.value = '';
         suggestionsContainer.innerHTML = '';
-
         const eAtor = todosOsNomes.atores.has(textoInputLower);
         const eProducao = todosOsNomes.producoes.has(textoInputLower);
-        
         if (!eAtor && !eProducao) {
             feedbackInputInvalido();
             return;
         }
-        
         const nomeCorreto = textoInput;
-
         if (nodesNaTela.has(nomeCorreto)) {
             const nodeExistente = document.querySelector(`[data-nome="${nomeCorreto}"]`);
             nodeExistente.classList.add('shake');
             setTimeout(() => nodeExistente.classList.remove('shake'), 500);
             return;
         }
-
         let nosPais = [];
         if (eProducao) {
             const producao = todosOsNomes.producoes.get(textoInputLower);
-            nosPais = producao.elenco
-                .filter(ator => nodesNaTela.has(ator))
-                .map(nome => document.querySelector(`[data-nome="${nome}"]`));
+            nosPais = producao.elenco.filter(ator => nodesNaTela.has(ator)).map(nome => document.querySelector(`[data-nome="${nome}"]`));
         } else {
             const producoesDoAtor = atorParaProducoes.get(nomeCorreto) || [];
-            nosPais = producoesDoAtor
-                .filter(titulo => nodesNaTela.has(titulo))
-                .map(nome => document.querySelector(`[data-nome="${nome}"]`));
+            nosPais = producoesDoAtor.filter(titulo => nodesNaTela.has(titulo)).map(nome => document.querySelector(`[data-nome="${nome}"]`));
         }
-        
         if (nosPais.length > 0) {
             const pos = calcularPosicaoFilho(nosPais[0]);
             const tipo = eProducao ? 'producao' : 'ator';
-            
             const novoNo = criarNode(nomeCorreto, tipo, pos, null);
-
             nosPais.forEach(noPai => {
                 criarLinha(novoNo, noPai);
             });
-            
             resolverTodasAsColisoes();
         } else {
             feedbackInputInvalido("Válido, mas não conecta com ninguém!");
@@ -232,12 +206,36 @@ document.addEventListener('DOMContentLoaded', () => {
         do {
             ator2Index = Math.floor(Math.random() * todosOsAtores.length);
         } while (ator1Index === ator2Index);
+        
         atorObjetivo1 = todosOsAtores[ator1Index];
         atorObjetivo2 = todosOsAtores[ator2Index];
-        const posEsquerda = { x: containerPrincipal.clientWidth * 0.2, y: containerPrincipal.clientHeight / 2 - 25 };
-        const posDireita = { x: containerPrincipal.clientWidth * 0.8 - 100, y: containerPrincipal.clientHeight / 2 - 25 };
-        const no1 = criarNode(atorObjetivo1, 'ator', posEsquerda);
-        const no2 = criarNode(atorObjetivo2, 'ator', posDireita);
+
+        let pos1, pos2;
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            pos1 = { 
+                x: containerPrincipal.clientWidth / 2 - 50,
+                y: containerPrincipal.clientHeight * 0.15 
+            };
+            pos2 = { 
+                x: containerPrincipal.clientWidth / 2 - 50,
+                y: containerPrincipal.clientHeight * 0.75 
+            };
+        } else {
+            pos1 = { 
+                x: containerPrincipal.clientWidth * 0.2, 
+                y: containerPrincipal.clientHeight / 2 - 25 
+            };
+            pos2 = { 
+                x: containerPrincipal.clientWidth * 0.8 - 100, 
+                y: containerPrincipal.clientHeight / 2 - 25 
+            };
+        }
+        
+        const no1 = criarNode(atorObjetivo1, 'ator', pos1);
+        const no2 = criarNode(atorObjetivo2, 'ator', pos2);
+        
         if (no1) no1.classList.add('box-ator-objetivo');
         if (no2) no2.classList.add('box-ator-objetivo');
     }
@@ -247,7 +245,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const idA = boxA.id, idB = boxB.id;
         if (document.querySelector(`[data-de="${idA}"][data-para="${idB}"], [data-de="${idB}"][data-para="${idA}"]`)) return;
         const linha = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        linha.setAttribute('data-de', idA); linha.setAttribute('data-para', idB);
+        linha.setAttribute('data-de', idA);
+        linha.setAttribute('data-para', idB);
         linha.setAttribute('stroke', extra ? '#aaa' : '#333');
         linha.setAttribute('stroke-width', extra ? '1' : '2');
         if (extra) linha.setAttribute('stroke-dasharray', '5,5');
@@ -309,13 +308,22 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => box.classList.remove('shake'), 500);
     }
 
+    // --- FUNÇÃO DE POSIÇÃO MODIFICADA ---
     function calcularPosicaoFilho(noPai) {
+        const isMobile = window.innerWidth <= 768;
         const angulo = Math.random() * 2 * Math.PI;
-        const distancia = 150 + Math.random() * 50;
+        
+        const distanciaBase = isMobile ? 80 : 150;
+        const distancia = distanciaBase + Math.random() * 40;
+
         let x = noPai.offsetLeft + Math.cos(angulo) * distancia;
         let y = noPai.offsetTop + Math.sin(angulo) * distancia;
         x = Math.max(20, Math.min(x, containerPrincipal.clientWidth - 150));
-        y = Math.max(20, Math.min(y, containerPrincipal.clientHeight - 80));
+
+        // Define o limite inferior dinamicamente com base na altura da UI
+        const limiteInferior = containerPrincipal.clientHeight - uiContainer.offsetHeight - 20; // 20px de margem
+        y = Math.max(20, Math.min(y, limiteInferior));
+        
         return { x, y };
     }
 
@@ -329,8 +337,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const boxDe = document.getElementById(linha.getAttribute('data-de')), boxPara = document.getElementById(linha.getAttribute('data-para'));
         if (boxDe && boxPara) {
             const c1 = getCentro(boxDe), c2 = getCentro(boxPara);
-            linha.setAttribute('x1', c1.x); linha.setAttribute('y1', c1.y);
-            linha.setAttribute('x2', c2.x); linha.setAttribute('y2', c2.y);
+            linha.setAttribute('x1', c1.x);
+            linha.setAttribute('y1', c1.y);
+            linha.setAttribute('x2', c2.x);
+            linha.setAttribute('y2', c2.y);
         }
     }
 
@@ -346,7 +356,8 @@ document.addEventListener('DOMContentLoaded', () => {
         isDragging = false;
         const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
         const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-        startX = clientX; startY = clientY;
+        startX = clientX;
+        startY = clientY;
         offsetX = clientX - elementoAtivo.offsetLeft;
         offsetY = clientY - elementoAtivo.offsetTop;
         document.addEventListener('mousemove', arrastar);
@@ -370,7 +381,11 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             let nX = clientX - offsetX, nY = clientY - offsetY;
             nX = Math.max(0, Math.min(nX, containerPrincipal.clientWidth - elementoAtivo.offsetWidth));
-            nY = Math.max(0, Math.min(nY, containerPrincipal.clientHeight - elementoAtivo.offsetHeight));
+            
+            // Aplica a mesma lógica de barreira inferior ao arrastar
+            const limiteInferior = containerPrincipal.clientHeight - uiContainer.offsetHeight - 20;
+            nY = Math.max(0, Math.min(nY, limiteInferior));
+
             elementoAtivo.style.left = `${nX}px`;
             elementoAtivo.style.top = `${nY}px`;
             atualizarLinhasParaBox(elementoAtivo);
@@ -450,5 +465,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+    
     iniciarTela();
 });
