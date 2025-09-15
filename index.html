@@ -3,17 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Nomes Conectados</title>
+    <title>Conecte os Artistas</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <div id="ui-container">
+        <input type="text" id="guess-input" placeholder="Digite um artista ou filme/série..." autocomplete="off">
+        <div id="suggestions-container"></div>
+        <button id="guess-button">Conectar</button>
+    </div>
 
     <svg id="container-linhas" width="100%" height="100%"></svg>
 
     <div id="container-principal">
         </div>
 
-    <script src="script.js"></script>
+    <div id="victory-popup" class="hidden">
+        <div class="popup-content">
+            <h2>Parabéns!</h2>
+            <p>Você conectou os artistas!</p>
+            <button id="restart-button">Jogar Novamente</button>
+        </div>
+    </div>
+
     <script src="dados.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
