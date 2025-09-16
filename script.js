@@ -21,6 +21,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareButton = document.getElementById('share-button');
     const viewport = document.getElementById('viewport');
     const resetZoomButton = document.getElementById('reset-zoom-button');
+    const artistInfoPanel = document.getElementById('artist-info-panel');
+    const artistInfoName = document.getElementById('artist-info-name');
+    const artistInfoList = document.getElementById('artist-info-list');
+    const artistInfoEmpty = document.getElementById('artist-info-empty');
+    const closeArtistInfoButton = document.getElementById('close-artist-info');
+    const artistInfoMeta = document.getElementById('artist-info-meta');
+    const watchLinksSection = document.getElementById('watch-links');
+    const watchCarousel = document.getElementById('watch-carousel');
+    const watchCarouselTrack = document.getElementById('watch-carousel-track');
+    const watchCarouselDots = document.getElementById('watch-carousel-dots');
+    const carouselControls = document.querySelector('.carousel-controls');
+    const carouselPrev = document.getElementById('carousel-prev');
+    const carouselNext = document.getElementById('carousel-next');
     const statArtistas = document.getElementById('stat-artistas');
     const statFilmes = document.getElementById('stat-filmes');
     const statSeries = document.getElementById('stat-series');
@@ -222,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statSeries.textContent = contagem.series;
         statNovelas.textContent = contagem.novelas;
         displayWinningPath(caminho);
+        atualizarLinksParaProducoes();
 
         victoryPopup.classList.remove('hidden');
         document.getElementById('input-wrapper').classList.add('hidden');
@@ -320,6 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
     showResultButton.addEventListener('click', () => {
         victoryPopup.classList.remove('hidden');
     });
+    closeArtistInfoButton.addEventListener('click', () => {
+        artistInfoPanel.classList.add('hidden');
+    });
     shareButton.addEventListener('click', () => {
         const numLinks = finalPath.length - 1;
         const shareText = `Conecte os Artistas! Consegui ligar ${atorObjetivo1} e ${atorObjetivo2} em ${numLinks} conexões!`;
@@ -336,6 +353,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     guessInput.addEventListener('input', mostrarSugestoes);
+    guessInput.addEventListener('focus', () => {
+        artistInfoPanel.classList.add('hidden');
+    });
+    if (carouselPrev && carouselNext) {
+        carouselPrev.addEventListener('click', slideAnterior);
+        carouselNext.addEventListener('click', proximoSlide);
+    }
+    window.addEventListener('resize', atualizarCarousel);
     guessInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const primeiraSugestao = suggestionsContainer.querySelector('.suggestion-item');
@@ -352,6 +377,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!e.target.closest('#game-ui-container')) {
             suggestionsContainer.innerHTML = '';
         }
+        if (window.innerWidth <= 768 && !artistInfoPanel.classList.contains('hidden')) {
+            const insidePanel = e.target.closest('#artist-info-panel');
+            const clickedNode = e.target.closest('.box-nome');
+            if (!insidePanel && !clickedNode) {
+                artistInfoPanel.classList.add('hidden');
+            }
+        }
     });
     document.addEventListener('keydown', (e) => {
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && document.activeElement !== guessInput) {
@@ -359,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function criarNode(nome, tipo, pos, noPai = null) {
+    function criarNode(nome, tipo, pos, noPai = null, bloqueado = false) {
         if (nodesNaTela.has(nome)) {
             const nodeExistente = document.querySelector(`[data-nome="${nome}"]`);
             if (nodeExistente && noPai) criarLinha(nodeExistente, noPai, true);
@@ -372,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         box.id = `box-${Date.now()}${Math.random()}`;
         box.dataset.nome = nome;
         box.dataset.tipo = tipo;
+        box.dataset.locked = bloqueado ? 'true' : 'false';
         const producaoInfo = producoes.find(p => p.titulo === nome);
         if (producaoInfo) {
             box.innerHTML = `<strong>${nome}</strong><br><small>${producaoInfo.tipo} (${producaoInfo.ano})</small>`;
@@ -385,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (noPai) {
             criarLinha(box, noPai);
         }
+        atualizarAreaTrabalho();
         return box;
     }
 
@@ -402,11 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
             pos1 = { 
-                x: window.innerWidth / 2 - 50,
+                x: window.innerWidth / 2,
                 y: window.innerHeight * 0.1
             };
             pos2 = { 
-                x: window.innerWidth / 2 - 50,
+                x: window.innerWidth / 2,
                 y: window.innerHeight * 0.75 
             };
         } else {
@@ -419,8 +453,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 y: window.innerHeight / 2 - 25 
             };
         }
-        const no1 = criarNode(atorObjetivo1, 'ator', pos1);
-        const no2 = criarNode(atorObjetivo2, 'ator', pos2);
+        const no1 = criarNode(atorObjetivo1, 'ator', pos1, null, true);
+        const no2 = criarNode(atorObjetivo2, 'ator', pos2, null, true);
+        if (isMobile) {
+            if (no1) {
+                no1.style.left = `${window.innerWidth / 2 - no1.offsetWidth / 2}px`;
+            }
+            if (no2) {
+                no2.style.left = `${window.innerWidth / 2 - no2.offsetWidth / 2}px`;
+            }
+            atualizarAreaTrabalho();
+        }
         if (no1) no1.classList.add('box-ator-objetivo');
         if (no2) no2.classList.add('box-ator-objetivo');
     }
@@ -460,37 +503,146 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleNodeClick(e) {
-        const boxClicado = e.currentTarget || e.target;
-        if (!boxClicado.dataset.nome) return;
-        const nome = boxClicado.dataset.nome;
+        const boxClicado = (elementoAtivo && elementoAtivo.dataset && elementoAtivo.dataset.nome)
+            ? elementoAtivo
+            : (e.target && e.target.closest ? e.target.closest('.box-nome') : null);
+        if (!boxClicado || !boxClicado.dataset.nome) return;
         const tipo = boxClicado.dataset.tipo;
-        let opcoesDeExpansao = [];
-        if (tipo === 'producao') {
-            const producao = producoes.find(p => p.titulo === nome);
-            opcoesDeExpansao = producao.elenco.filter(ator => !nodesNaTela.has(ator));
-            if (opcoesDeExpansao.length > 0) {
-                const proximoAtor = opcoesDeExpansao[0];
-                const pos = calcularPosicaoFilho(boxClicado);
-                criarNode(proximoAtor, 'ator', pos, boxClicado);
-            } else {
-                feedbackSemExpansao(boxClicado);
-            }
-        } else {
-            const producoesDoAtor = atorParaProducoes.get(nome);
-            opcoesDeExpansao = producoesDoAtor.filter(titulo => !nodesNaTela.has(titulo));
-            if (opcoesDeExpansao.length > 0) {
-                const proximaProducao = opcoesDeExpansao[0];
-                const pos = calcularPosicaoFilho(boxClicado);
-                criarNode(proximaProducao, 'producao', pos, boxClicado);
-            } else {
-                feedbackSemExpansao(boxClicado);
-            }
+        if (tipo === 'ator') {
+            mostrarInfoArtista(boxClicado.dataset.nome);
+        } else if (tipo === 'producao') {
+            mostrarInfoProducao(boxClicado.dataset.nome);
         }
     }
 
-    function feedbackSemExpansao(box) {
-        box.classList.add('shake');
-        setTimeout(() => box.classList.remove('shake'), 500);
+    function obterDetalhesDoAtor(nome) {
+        const producoesDoAtor = atorParaProducoes.get(nome) || [];
+        const detalhes = producoesDoAtor
+            .filter(titulo => nodesNaTela.has(titulo))
+            .map(titulo => {
+                const producao = todosOsNomes.producoes.get(titulo.toLowerCase());
+                if (!producao) return null;
+                return { titulo: producao.titulo, tipo: producao.tipo, ano: producao.ano };
+            })
+            .filter(Boolean);
+        detalhes.sort((a, b) => {
+            if (a.ano !== b.ano) {
+                return a.ano - b.ano;
+            }
+            return a.titulo.localeCompare(b.titulo);
+        });
+        return detalhes;
+    }
+
+    function mostrarInfoArtista(nome) {
+        artistInfoName.textContent = nome;
+        artistInfoList.innerHTML = '';
+        const detalhes = obterDetalhesDoAtor(nome);
+        artistInfoMeta.textContent = 'Artista';
+        if (detalhes.length === 0) {
+            artistInfoEmpty.textContent = 'Nenhuma participação descoberta nesta partida ainda.';
+            artistInfoEmpty.classList.remove('hidden');
+        } else {
+            artistInfoEmpty.classList.add('hidden');
+            detalhes.forEach(info => {
+                const item = document.createElement('li');
+                const titulo = document.createElement('strong');
+                titulo.textContent = info.titulo;
+                const resumo = document.createElement('span');
+                resumo.textContent = `${info.tipo} - ${info.ano}`;
+                item.appendChild(titulo);
+                item.appendChild(resumo);
+                artistInfoList.appendChild(item);
+            });
+        }
+        artistInfoPanel.classList.remove('hidden');
+    }
+
+    function mostrarInfoProducao(nome) {
+        const producao = todosOsNomes.producoes.get(nome.toLowerCase());
+        if (!producao) return;
+        artistInfoName.textContent = producao.titulo;
+        artistInfoList.innerHTML = '';
+        artistInfoMeta.textContent = `${producao.tipo} • ${producao.ano}`;
+        const artistasDescobertos = producao.elenco.filter(ator => nodesNaTela.has(ator));
+        if (artistasDescobertos.length === 0) {
+            artistInfoEmpty.textContent = 'Nenhum artista desta produção foi descoberto nesta partida ainda.';
+            artistInfoEmpty.classList.remove('hidden');
+        } else {
+            artistInfoEmpty.classList.add('hidden');
+            artistasDescobertos.sort((a, b) => a.localeCompare(b)).forEach(ator => {
+                const item = document.createElement('li');
+                item.textContent = ator;
+                artistInfoList.appendChild(item);
+            });
+        }
+        artistInfoPanel.classList.remove('hidden');
+    }
+
+    let carouselIndex = 0;
+
+    function atualizarLinksParaProducoes() {
+        watchCarouselTrack.innerHTML = '';
+        watchCarouselDots.innerHTML = '';
+        const producoesDescobertas = Array.from(nodesNaTela)
+            .filter(nome => todosOsNomes.producoes.has(nome.toLowerCase()))
+            .map(nome => todosOsNomes.producoes.get(nome.toLowerCase()))
+            .filter(producao => producao && producao.link);
+        if (producoesDescobertas.length === 0) {
+            watchLinksSection.classList.add('hidden');
+            return;
+        }
+        producoesDescobertas.sort((a, b) => a.titulo.localeCompare(b.titulo));
+        producoesDescobertas.forEach((producao, index) => {
+            const card = document.createElement('div');
+            card.className = 'watch-card';
+            const img = document.createElement('img');
+            img.src = producao.imagem || 'https://via.placeholder.com/800x1200?text=Sem+imagem';
+            img.alt = producao.titulo;
+            const titulo = document.createElement('h4');
+            titulo.textContent = producao.titulo;
+            card.appendChild(img);
+            card.appendChild(titulo);
+            card.addEventListener('click', () => {
+                window.open(producao.link, '_blank', 'noopener');
+            });
+            watchCarouselTrack.appendChild(card);
+
+            const dot = document.createElement('span');
+            dot.className = 'watch-dot';
+            dot.dataset.index = index;
+            dot.addEventListener('click', () => irParaSlide(index));
+            watchCarouselDots.appendChild(dot);
+        });
+        watchLinksSection.classList.remove('hidden');
+        carouselControls.classList.toggle('hidden', producoesDescobertas.length <= 1);
+        carouselIndex = 0;
+        atualizarCarousel();
+    }
+
+    function atualizarCarousel() {
+        const total = watchCarouselTrack.children.length;
+        if (total === 0) return;
+        const offset = -carouselIndex * watchCarousel.offsetWidth;
+        watchCarouselTrack.style.transform = `translateX(${offset}px)`;
+        Array.from(watchCarouselDots.children).forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === carouselIndex);
+        });
+    }
+
+    function irParaSlide(index) {
+        const total = watchCarouselTrack.children.length;
+        if (total === 0) return;
+        carouselIndex = (index + total) % total;
+        atualizarCarousel();
+    }
+
+    function proximoSlide() {
+        irParaSlide(carouselIndex + 1);
+    }
+
+    function slideAnterior() {
+        irParaSlide(carouselIndex - 1);
     }
 
     function calcularPosicaoFilho(noPai) {
@@ -507,12 +659,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const distanciaBase = isMobile ? 80 : 150;
         const distancia = distanciaBase + Math.random() * 40;
-        let x = noPai.offsetLeft + Math.cos(angulo) * distancia;
-        let y = noPai.offsetTop + Math.sin(angulo) * distancia;
-        x = Math.max(20, Math.min(x, window.innerWidth - 150));
-        const alturaEstimadaNo = 60;
-        const limiteInferior = window.innerHeight - gameUiContainer.offsetHeight - alturaEstimadaNo;
-        y = Math.max(20, Math.min(y, limiteInferior));
+        const x = noPai.offsetLeft + Math.cos(angulo) * distancia;
+        const y = noPai.offsetTop + Math.sin(angulo) * distancia;
         return { x, y };
     }
 
@@ -557,6 +705,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function arrastar(e) {
         if (!elementoAtivo) return;
+        if (elementoAtivo.dataset.locked === 'true') {
+            e.preventDefault();
+            return;
+        }
         const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
         const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
         if (!isDragging) {
@@ -568,18 +720,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (isDragging) {
             e.preventDefault();
-            let nX = clientX - offsetX;
-            let nY = clientY - offsetY;
-            
-            const limiteInferior = window.innerHeight - gameUiContainer.offsetHeight - elementoAtivo.offsetHeight;
-            
-            nX = Math.max(0, Math.min(nX, window.innerWidth - elementoAtivo.offsetWidth));
-            nY = Math.max(0, Math.min(nY, limiteInferior));
+            const nX = clientX - offsetX;
+            const nY = clientY - offsetY;
 
             elementoAtivo.style.left = `${nX}px`;
             elementoAtivo.style.top = `${nY}px`;
             atualizarLinhasParaBox(elementoAtivo);
             resolverTodasAsColisoes();
+            atualizarAreaTrabalho();
         }
     }
 
@@ -606,6 +754,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const boxB = todosOsBoxes[k];
                     const rectA = boxA.getBoundingClientRect();
                     const rectB = boxB.getBoundingClientRect();
+                    const lockedA = boxA.dataset.locked === 'true';
+                    const lockedB = boxB.dataset.locked === 'true';
                     if (rectA.left < rectB.right && rectA.right > rectB.left && rectA.top < rectB.bottom && rectA.bottom > rectB.top) {
                         const overlapX = Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left);
                         const overlapY = Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top);
@@ -644,16 +794,61 @@ document.addEventListener('DOMContentLoaded', () => {
                             moverBX = 0;
                             moverBY = 0;
                         }
-                        boxA.style.left = `${Math.max(0, Math.min(boxA.offsetLeft + moverAX, window.innerWidth - boxA.offsetWidth))}px`;
-                        boxA.style.top = `${Math.max(0, Math.min(boxA.offsetTop + moverAY, window.innerHeight - boxA.offsetHeight))}px`;
-                        boxB.style.left = `${Math.max(0, Math.min(boxB.offsetLeft + moverBX, window.innerWidth - boxB.offsetWidth))}px`;
-                        boxB.style.top = `${Math.max(0, Math.min(boxB.offsetTop + moverBY, window.innerHeight - boxB.offsetHeight))}px`;
-                        atualizarLinhasParaBox(boxA);
-                        atualizarLinhasParaBox(boxB);
+                        if (!lockedA) {
+                            boxA.style.left = `${boxA.offsetLeft + moverAX}px`;
+                            boxA.style.top = `${boxA.offsetTop + moverAY}px`;
+                            atualizarLinhasParaBox(boxA);
+                        }
+                        if (!lockedB) {
+                            boxB.style.left = `${boxB.offsetLeft + moverBX}px`;
+                            boxB.style.top = `${boxB.offsetTop + moverBY}px`;
+                            atualizarLinhasParaBox(boxB);
+                        }
                     }
                 }
             }
         }
+        atualizarAreaTrabalho();
+    }
+
+    function atualizarAreaTrabalho() {
+        const boxes = Array.from(document.querySelectorAll('.box-nome'));
+        if (boxes.length === 0) return;
+        const margem = 200;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = window.innerWidth;
+        let maxY = window.innerHeight;
+        boxes.forEach(box => {
+            const left = box.offsetLeft;
+            const top = box.offsetTop;
+            minX = Math.min(minX, left);
+            minY = Math.min(minY, top);
+            maxX = Math.max(maxX, left + box.offsetWidth + margem);
+            maxY = Math.max(maxY, top + box.offsetHeight + margem);
+        });
+
+        let shiftX = 0;
+        let shiftY = 0;
+        const limiteMinimo = 50;
+        if (minX < limiteMinimo) shiftX = limiteMinimo - minX;
+        if (minY < limiteMinimo) shiftY = limiteMinimo - minY;
+        if (shiftX !== 0 || shiftY !== 0) {
+            boxes.forEach(box => {
+                box.style.left = `${box.offsetLeft + shiftX}px`;
+                box.style.top = `${box.offsetTop + shiftY}px`;
+            });
+            document.querySelectorAll('#container-linhas line').forEach(atualizarLinha);
+            maxX += shiftX;
+            maxY += shiftY;
+        }
+
+        containerPrincipal.style.width = `${maxX}px`;
+        containerPrincipal.style.height = `${maxY}px`;
+        containerLinhas.style.width = `${maxX}px`;
+        containerLinhas.style.height = `${maxY}px`;
+        containerLinhas.setAttribute('width', maxX);
+        containerLinhas.setAttribute('height', maxY);
     }
     
     iniciarTela();

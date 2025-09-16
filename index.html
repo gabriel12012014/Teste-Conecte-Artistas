@@ -17,6 +17,18 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
     </button>
 
+    <aside id="artist-info-panel" class="hidden">
+        <div class="artist-info-header">
+            <h3 id="artist-info-name"></h3>
+            <button id="close-artist-info" aria-label="Fechar informações do artista">&times;</button>
+        </div>
+        <div id="artist-info-content">
+            <p id="artist-info-meta"></p>
+            <p id="artist-info-empty">Clique em um artista ou obra para ver os detalhes descobertos.</p>
+            <ul id="artist-info-list"></ul>
+        </div>
+    </aside>
+
     <div id="game-ui-container">
         <div id="input-wrapper">
             <input type="text" id="guess-input" placeholder="Digite um artista ou filme/série..." autocomplete="off">
@@ -54,7 +66,20 @@
             </div>
 
             <div id="path-display"></div>
-            
+
+            <div id="watch-links" class="hidden">
+                <h3>Assista no Globoplay</h3>
+                <p class="watch-hint">Clique nas imagens para assistir</p>
+                <div class="carousel-controls hidden">
+                    <button id="carousel-prev" aria-label="Anterior">&#10094;</button>
+                    <button id="carousel-next" aria-label="Próximo">&#10095;</button>
+                </div>
+                <div id="watch-carousel">
+                    <div id="watch-carousel-track"></div>
+                </div>
+                <div id="watch-carousel-dots"></div>
+            </div>
+
             <div class="popup-buttons">
                 <button id="share-button">Compartilhar</button>
                 <button id="restart-button">Novo Jogo</button>
