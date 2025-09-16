@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // --- ELEMENTOS DO DOM ---
     const containerPrincipal = document.getElementById('container-principal');
     const containerLinhas = document.getElementById('container-linhas');
     const guessInput = document.getElementById('guess-input');
@@ -12,15 +13,137 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestionsContainer = document.getElementById('suggestions-container');
     const victoryPopup = document.getElementById('victory-popup');
     const restartButton = document.getElementById('restart-button');
-    // --- NOVO ELEMENTO REFERENCIADO ---
-    const uiContainer = document.getElementById('ui-container');
+    const gameUiContainer = document.getElementById('game-ui-container');
+    const closePopupButton = document.getElementById('close-popup-button');
+    const showResultButton = document.getElementById('show-result-button');
+    const pathLengthElement = document.getElementById('path-length');
+    const pathDisplayElement = document.getElementById('path-display');
+    const shareButton = document.getElementById('share-button');
+    const viewport = document.getElementById('viewport');
+    const resetZoomButton = document.getElementById('reset-zoom-button');
+    const statArtistas = document.getElementById('stat-artistas');
+    const statFilmes = document.getElementById('stat-filmes');
+    const statSeries = document.getElementById('stat-series');
+    const statNovelas = document.getElementById('stat-novelas');
     
+    // --- VARIÁVEIS DE ESTADO DO JOGO ---
     const nodesNaTela = new Set();
     const atorParaProducoes = new Map();
     const todosOsNomes = { atores: new Set(), producoes: new Map() };
     let todosOsNomesArray = [];
     let atorObjetivo1 = null;
     let atorObjetivo2 = null;
+    let finalPath = [];
+
+    // --- VARIÁVEIS PARA ZOOM E PAN ---
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let startPanX = 0;
+    let startPanY = 0;
+    let initialPinchDistance = null;
+
+    function applyTransform() {
+        viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+
+    function resetZoom() {
+        scale = 1;
+        panX = 0;
+        panY = 0;
+        applyTransform();
+    }
+    
+    resetZoomButton.addEventListener('click', resetZoom);
+
+    // --- LÓGICA DE ZOOM (SCROLL DO RATO) ---
+    document.body.addEventListener('wheel', (e) => {
+        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        e.preventDefault();
+        
+        const zoomIntensity = 0.1;
+        const delta = e.deltaY > 0 ? -1 : 1;
+        const newScale = Math.max(0.3, Math.min(2, scale + delta * zoomIntensity));
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+
+        panX = mouseX - (mouseX - panX) * (newScale / scale);
+        panY = mouseY - (mouseY - panY) * (newScale / scale);
+        
+        scale = newScale;
+        applyTransform();
+    }, { passive: false });
+
+    // --- LÓGICA DE PAN (ARRASTAR O FUNDO) ---
+    document.body.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.box-nome') || e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        isPanning = true;
+        startPanX = e.clientX - panX;
+        startPanY = e.clientY - panY;
+        document.body.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        panX = e.clientX - startPanX;
+        panY = e.clientY - startPanY;
+        applyTransform();
+    });
+
+    document.addEventListener('mouseup', () => {
+        isPanning = false;
+        document.body.style.cursor = 'default';
+    });
+
+    // --- LÓGICA DE ZOOM E PAN PARA MOBILE ---
+    document.body.addEventListener('touchstart', (e) => {
+        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        
+        if (e.touches.length === 1 && !e.target.closest('.box-nome')) {
+            isPanning = true;
+            startPanX = e.touches[0].clientX - panX;
+            startPanY = e.touches[0].clientY - panY;
+        } else if (e.touches.length === 2) {
+            isPanning = false;
+            initialPinchDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }
+    }, { passive: false });
+
+    document.body.addEventListener('touchmove', (e) => {
+        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        e.preventDefault();
+
+        if (isPanning && e.touches.length === 1) {
+            panX = e.touches[0].clientX - startPanX;
+            panY = e.touches[0].clientY - startPanY;
+            applyTransform();
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            const currentPinchDistance = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const pinchRatio = currentPinchDistance / initialPinchDistance;
+            const newScale = Math.max(0.3, Math.min(2, scale * pinchRatio));
+            const midPointX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const midPointY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            
+            panX = midPointX - (midPointX - panX) * (newScale / scale);
+            panY = midPointY - (midPointY - panY) * (newScale / scale);
+            
+            scale = newScale;
+            initialPinchDistance = currentPinchDistance;
+            applyTransform();
+        }
+    }, { passive: false });
+
+    document.body.addEventListener('touchend', () => {
+        isPanning = false;
+        initialPinchDistance = null;
+    });
 
     function preProcessarDados() {
         const atoresSet = new Set();
@@ -62,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const [noAtual, caminho] = fila.shift();
             if (noAtual === atorObjetivo2) {
                 destacarCaminhoVitoria(caminho);
-                victoryPopup.classList.remove('hidden');
+                fimDeJogo(caminho);
                 return;
             }
             const vizinhos = adjacencias.get(noAtual) || [];
@@ -74,6 +197,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+    }
+
+    function fimDeJogo(caminho) {
+        finalPath = caminho;
+        const numLinks = caminho.length - 1;
+
+        let contagem = { artistas: 0, filmes: 0, series: 0, novelas: 0 };
+        caminho.forEach(nome => {
+            const nomeLower = nome.toLowerCase();
+            if (todosOsNomes.atores.has(nomeLower)) {
+                contagem.artistas++;
+            } else if (todosOsNomes.producoes.has(nomeLower)) {
+                const tipo = todosOsNomes.producoes.get(nomeLower).tipo;
+                if (tipo === 'Filme') contagem.filmes++;
+                else if (tipo === 'Série') contagem.series++;
+                else if (tipo === 'Novela') contagem.novelas++;
+            }
+        });
+
+        pathLengthElement.textContent = numLinks;
+        statArtistas.textContent = contagem.artistas;
+        statFilmes.textContent = contagem.filmes;
+        statSeries.textContent = contagem.series;
+        statNovelas.textContent = contagem.novelas;
+        displayWinningPath(caminho);
+
+        victoryPopup.classList.remove('hidden');
+        document.getElementById('input-wrapper').classList.add('hidden');
+        showResultButton.classList.remove('hidden');
+    }
+
+    function displayWinningPath(caminho) {
+        pathDisplayElement.innerHTML = '';
+        caminho.forEach((nome, index) => {
+            const stepSpan = document.createElement('span');
+            stepSpan.className = 'path-step';
+            stepSpan.textContent = nome;
+            if (index === 0 || index === caminho.length - 1) {
+                stepSpan.classList.add('path-objective');
+            }
+            pathDisplayElement.appendChild(stepSpan);
+            if (index < caminho.length - 1) {
+                const separatorSpan = document.createElement('span');
+                separatorSpan.className = 'path-separator';
+                separatorSpan.textContent = ' → ';
+                pathDisplayElement.appendChild(separatorSpan);
+            }
+        });
     }
 
     function destacarCaminhoVitoria(caminho) {
@@ -91,8 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleGuess() {
         const textoInput = guessInput.value.trim();
-        const textoInputLower = textoInput.toLowerCase();
         if (!textoInput) return;
+        guessInput.blur();
+        const textoInputLower = textoInput.toLowerCase();
         guessInput.value = '';
         suggestionsContainer.innerHTML = '';
         const eAtor = todosOsNomes.atores.has(textoInputLower);
@@ -133,17 +305,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const placeholderOriginal = guessInput.placeholder;
         guessInput.value = '';
         guessInput.placeholder = mensagem;
-        guessInput.classList.add('shake');
+        document.getElementById('input-wrapper').classList.add('shake');
         setTimeout(() => {
-            guessInput.classList.remove('shake');
+            document.getElementById('input-wrapper').classList.remove('shake');
             guessInput.placeholder = placeholderOriginal;
         }, 2000);
     }
 
     guessButton.addEventListener('click', handleGuess);
     restartButton.addEventListener('click', () => { location.reload(); });
+    closePopupButton.addEventListener('click', () => {
+        victoryPopup.classList.add('hidden');
+    });
+    showResultButton.addEventListener('click', () => {
+        victoryPopup.classList.remove('hidden');
+    });
+    shareButton.addEventListener('click', () => {
+        const numLinks = finalPath.length - 1;
+        const shareText = `Conecte os Artistas! Consegui ligar ${atorObjetivo1} e ${atorObjetivo2} em ${numLinks} conexões!`;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Conecte os Artistas',
+                text: shareText,
+                url: window.location.href
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('Resultado copiado para a área de transferência!');
+            });
+        }
+    });
     guessInput.addEventListener('input', mostrarSugestoes);
-
     guessInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const primeiraSugestao = suggestionsContainer.querySelector('.suggestion-item');
@@ -156,13 +348,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('#ui-container')) {
+        if (!e.target.closest('#game-ui-container')) {
             suggestionsContainer.innerHTML = '';
         }
     });
-
     document.addEventListener('keydown', (e) => {
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && document.activeElement !== guessInput) {
             guessInput.focus();
@@ -206,36 +396,31 @@ document.addEventListener('DOMContentLoaded', () => {
         do {
             ator2Index = Math.floor(Math.random() * todosOsAtores.length);
         } while (ator1Index === ator2Index);
-        
         atorObjetivo1 = todosOsAtores[ator1Index];
         atorObjetivo2 = todosOsAtores[ator2Index];
-
         let pos1, pos2;
         const isMobile = window.innerWidth <= 768;
-
         if (isMobile) {
             pos1 = { 
-                x: containerPrincipal.clientWidth / 2 - 50,
-                y: containerPrincipal.clientHeight * 0.15 
+                x: window.innerWidth / 2 - 50,
+                y: window.innerHeight * 0.1
             };
             pos2 = { 
-                x: containerPrincipal.clientWidth / 2 - 50,
-                y: containerPrincipal.clientHeight * 0.75 
+                x: window.innerWidth / 2 - 50,
+                y: window.innerHeight * 0.75 
             };
         } else {
             pos1 = { 
-                x: containerPrincipal.clientWidth * 0.2, 
-                y: containerPrincipal.clientHeight / 2 - 25 
+                x: window.innerWidth * 0.2, 
+                y: window.innerHeight / 2 - 25 
             };
             pos2 = { 
-                x: containerPrincipal.clientWidth * 0.8 - 100, 
-                y: containerPrincipal.clientHeight / 2 - 25 
+                x: window.innerWidth * 0.8 - 100, 
+                y: window.innerHeight / 2 - 25 
             };
         }
-        
         const no1 = criarNode(atorObjetivo1, 'ator', pos1);
         const no2 = criarNode(atorObjetivo2, 'ator', pos2);
-        
         if (no1) no1.classList.add('box-ator-objetivo');
         if (no2) no2.classList.add('box-ator-objetivo');
     }
@@ -308,22 +493,26 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => box.classList.remove('shake'), 500);
     }
 
-    // --- FUNÇÃO DE POSIÇÃO MODIFICADA ---
     function calcularPosicaoFilho(noPai) {
         const isMobile = window.innerWidth <= 768;
-        const angulo = Math.random() * 2 * Math.PI;
-        
+        let angulo;
+        if (isMobile) {
+            if (noPai.offsetTop < window.innerHeight / 2) {
+                angulo = Math.random() * Math.PI;
+            } else {
+                angulo = Math.PI + Math.random() * Math.PI;
+            }
+        } else {
+            angulo = Math.random() * 2 * Math.PI;
+        }
         const distanciaBase = isMobile ? 80 : 150;
         const distancia = distanciaBase + Math.random() * 40;
-
         let x = noPai.offsetLeft + Math.cos(angulo) * distancia;
         let y = noPai.offsetTop + Math.sin(angulo) * distancia;
-        x = Math.max(20, Math.min(x, containerPrincipal.clientWidth - 150));
-
-        // Define o limite inferior dinamicamente com base na altura da UI
-        const limiteInferior = containerPrincipal.clientHeight - uiContainer.offsetHeight - 20; // 20px de margem
+        x = Math.max(20, Math.min(x, window.innerWidth - 150));
+        const alturaEstimadaNo = 60;
+        const limiteInferior = window.innerHeight - gameUiContainer.offsetHeight - alturaEstimadaNo;
         y = Math.max(20, Math.min(y, limiteInferior));
-        
         return { x, y };
     }
 
@@ -379,11 +568,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (isDragging) {
             e.preventDefault();
-            let nX = clientX - offsetX, nY = clientY - offsetY;
-            nX = Math.max(0, Math.min(nX, containerPrincipal.clientWidth - elementoAtivo.offsetWidth));
+            let nX = clientX - offsetX;
+            let nY = clientY - offsetY;
             
-            // Aplica a mesma lógica de barreira inferior ao arrastar
-            const limiteInferior = containerPrincipal.clientHeight - uiContainer.offsetHeight - 20;
+            const limiteInferior = window.innerHeight - gameUiContainer.offsetHeight - elementoAtivo.offsetHeight;
+            
+            nX = Math.max(0, Math.min(nX, window.innerWidth - elementoAtivo.offsetWidth));
             nY = Math.max(0, Math.min(nY, limiteInferior));
 
             elementoAtivo.style.left = `${nX}px`;
@@ -454,10 +644,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             moverBX = 0;
                             moverBY = 0;
                         }
-                        boxA.style.left = `${Math.max(0, Math.min(boxA.offsetLeft + moverAX, containerPrincipal.clientWidth - boxA.offsetWidth))}px`;
-                        boxA.style.top = `${Math.max(0, Math.min(boxA.offsetTop + moverAY, containerPrincipal.clientHeight - boxA.offsetHeight))}px`;
-                        boxB.style.left = `${Math.max(0, Math.min(boxB.offsetLeft + moverBX, containerPrincipal.clientWidth - boxB.offsetWidth))}px`;
-                        boxB.style.top = `${Math.max(0, Math.min(boxB.offsetTop + moverBY, containerPrincipal.clientHeight - boxA.offsetHeight))}px`;
+                        boxA.style.left = `${Math.max(0, Math.min(boxA.offsetLeft + moverAX, window.innerWidth - boxA.offsetWidth))}px`;
+                        boxA.style.top = `${Math.max(0, Math.min(boxA.offsetTop + moverAY, window.innerHeight - boxA.offsetHeight))}px`;
+                        boxB.style.left = `${Math.max(0, Math.min(boxB.offsetLeft + moverBX, window.innerWidth - boxB.offsetWidth))}px`;
+                        boxB.style.top = `${Math.max(0, Math.min(boxB.offsetTop + moverBY, window.innerHeight - boxB.offsetHeight))}px`;
                         atualizarLinhasParaBox(boxA);
                         atualizarLinhasParaBox(boxB);
                     }

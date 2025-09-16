@@ -2,28 +2,63 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Conecte os Artistas</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="ui-container">
-        <input type="text" id="guess-input" placeholder="Digite um artista ou filme/série..." autocomplete="off">
-        <div id="suggestions-container"></div>
-        <button id="guess-button">Conectar</button>
+    <div id="viewport">
+        <svg id="container-linhas" width="100%" height="100%"></svg>
+        <div id="container-principal"></div>
     </div>
 
-    <svg id="container-linhas" width="100%" height="100%"></svg>
+    <button id="reset-zoom-button">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+    </button>
 
-    <div id="container-principal">
+    <div id="game-ui-container">
+        <div id="input-wrapper">
+            <input type="text" id="guess-input" placeholder="Digite um artista ou filme/série..." autocomplete="off">
+            <button id="guess-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M16.172 11l-5.364-5.364 1.414-1.414L20 12l-7.778 7.778-1.414-1.414L16.172 13H4v-2z"/></svg>
+            </button>
         </div>
+        <div id="suggestions-container"></div>
+        <button id="show-result-button" class="hidden">Ver Resultado</button>
+    </div>
 
     <div id="victory-popup" class="hidden">
         <div class="popup-content">
+            <button id="close-popup-button" class="close-button">&times;</button>
             <h2>Parabéns!</h2>
-            <p>Você conectou os artistas!</p>
-            <button id="restart-button">Jogar Novamente</button>
+            <p>Você conectou os artistas em <strong id="path-length">0</strong> conexões!</p>
+            
+            <div id="path-stats">
+                <div class="stat-item">
+                    <span id="stat-artistas">0</span>
+                    <label>Artistas</label>
+                </div>
+                <div class="stat-item">
+                    <span id="stat-filmes">0</span>
+                    <label>Filmes</label>
+                </div>
+                <div class="stat-item">
+                    <span id="stat-series">0</span>
+                    <label>Séries</label>
+                </div>
+                <div class="stat-item">
+                    <span id="stat-novelas">0</span>
+                    <label>Novelas</label>
+                </div>
+            </div>
+
+            <div id="path-display"></div>
+            
+            <div class="popup-buttons">
+                <button id="share-button">Compartilhar</button>
+                <button id="restart-button">Novo Jogo</button>
+            </div>
         </div>
     </div>
 

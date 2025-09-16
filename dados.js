@@ -72,5 +72,47 @@ const producoes = [
         "ano": 2003,
         "tipo": "Filme",
         "elenco": ["Luiz Carlos Vasconcelos", "Milton Gonçalves", "Lázaro Ramos", "Rodrigo Santoro", "Wagner Moura", "Milhem Cortaz"]
+    },
+    {
+        "titulo": "Senhora do Destino",
+        "ano": 2004,
+        "tipo": "Novela",
+        "elenco": ["Susana Vieira", "Renata Sorrah", "José Wilker", "Carolina Dieckmann", "Eduardo Moscovis", "Letícia Spiller"]
+    },
+    {
+        "titulo": "O Clone",
+        "ano": 2001,
+        "tipo": "Novela",
+        "elenco": ["Murilo Benício", "Giovanna Antonelli", "Juca de Oliveira", "Vera Fischer", "Dalton Vigh", "Letícia Sabatella"]
+    },
+    {
+        "titulo": "Chocolate com Pimenta",
+        "ano": 2003,
+        "tipo": "Novela",
+        "elenco": ["Mariana Ximenes", "Murilo Benício", "Priscila Fantin", "Elizabeth Savalla", "Ary Fontoura", "Marcello Novaes"]
+    },
+    {
+        "titulo": "Laços de Família",
+        "ano": 2000,
+        "tipo": "Novela",
+        "elenco": ["Vera Fischer", "Carolina Dieckmann", "Reynaldo Gianecchini", "José Mayer", "Tony Ramos", "Marieta Severo"]
+    },
+    {
+        "titulo": "Pantanal",
+        "ano": 2022,
+        "tipo": "Novela",
+        "elenco": ["Alanis Guillen", "Jesuíta Barbosa", "Marcos Palmeira", "Dira Paes", "Murilo Benício", "Isabel Teixeira"]
+    },
+    {
+        "titulo": "Amor de Mãe",
+        "ano": 2019,
+        "tipo": "Novela",
+        "elenco": ["Regina Casé", "Adriana Esteves", "Taís Araújo", "Murilo Benício", "Vladimir Brichta", "Ísis Valverde"]
+    },
+    {
+        "titulo": "Aruanas",
+        "ano": 2019,
+        "tipo": "Série",
+        "elenco": ["Débora Falabella", "Taís Araújo", "Leandra Leal", "Thainá Duarte", "Lázaro Ramos", "Luiz Carlos Vasconcelos"]
     }
 ];
