@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <header id="top-ui">
+        <div class="top-ui-inner">
+            <h1 class="page-title">Conecte os Artistas</h1>
+            <p id="page-subtitle" class="page-subtitle"></p>
+        </div>
+    </header>
 
     <div id="viewport">
         <svg id="container-linhas" width="100%" height="100%"></svg>
@@ -15,6 +21,9 @@
 
     <button id="reset-zoom-button">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+    </button>
+    <button id="help-button" aria-label="Como jogar">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2a2 2 0 1 1 2 2c-1.1 0-2 .9-2 2v1h2v-1c0-.55.45-1 1-1a4 4 0 1 0-1-7.75z"/></svg>
     </button>
 
     <aside id="artist-info-panel" class="hidden">
@@ -38,6 +47,12 @@
         </div>
         <div id="suggestions-container"></div>
         <button id="show-result-button" class="hidden">Ver Resultado</button>
+        <div id="bottom-stats" aria-live="polite">
+            <div class="stat-chip"><span id="live-artistas">0</span><label>Artistas</label></div>
+            <div class="stat-chip"><span id="live-filmes">0</span><label>Filmes</label></div>
+            <div class="stat-chip"><span id="live-series">0</span><label>Séries</label></div>
+            <div class="stat-chip"><span id="live-novelas">0</span><label>Novelas</label></div>
+        </div>
     </div>
 
     <div id="victory-popup" class="hidden">
@@ -83,6 +98,40 @@
             <div class="popup-buttons">
                 <button id="share-button">Compartilhar</button>
                 <button id="restart-button">Novo Jogo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial inicial (primeiro acesso) -->
+    <div id="tutorial-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+        <div class="tutorial-content">
+            <button id="tutorial-close" class="close-button" aria-label="Fechar tutorial">&times;</button>
+            <h2 id="tutorial-title">Como Jogar</h2>
+
+            <div class="tutorial-steps">
+                <div class="tutorial-step">
+                    <div class="tutorial-icon" aria-hidden="true">👥</div>
+                    <h3>- O Objetivo -</h3>
+                    <p>Descubra como dois artistas se conectam através das produções.</p>
+                </div>
+                <div class="tutorial-step">
+                    <div class="tutorial-icon" aria-hidden="true">🎬</div>
+                    <h3>- Expanda o Mapa -</h3>
+                    <p>Digite nomes de artistas ou filmes/séries/novelas conectados aos que já estão na tela.</p>
+                </div>
+                <div class="tutorial-step">
+                    <div class="tutorial-icon" aria-hidden="true">⭐</div>
+                    <h3>- Encontre o Caminho -</h3>
+                    <p>Desafie-se a achar a menor conexão entre os dois artistas.</p>
+                </div>
+            </div>
+
+            <div class="tutorial-actions">
+                <label class="tutorial-optout">
+                    <input type="checkbox" id="tutorial-dont-show">
+                    Não mostrar novamente
+                </label>
+                <button id="tutorial-start-button" class="tutorial-start">Começar</button>
             </div>
         </div>
     </div>

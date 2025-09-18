@@ -21,6 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareButton = document.getElementById('share-button');
     const viewport = document.getElementById('viewport');
     const resetZoomButton = document.getElementById('reset-zoom-button');
+    const liveArtistas = document.getElementById('live-artistas');
+    const liveFilmes = document.getElementById('live-filmes');
+    const liveSeries = document.getElementById('live-series');
+    const liveNovelas = document.getElementById('live-novelas');
+    const pageSubtitle = document.getElementById('page-subtitle');
     const artistInfoPanel = document.getElementById('artist-info-panel');
     const artistInfoName = document.getElementById('artist-info-name');
     const artistInfoList = document.getElementById('artist-info-list');
@@ -38,7 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const statFilmes = document.getElementById('stat-filmes');
     const statSeries = document.getElementById('stat-series');
     const statNovelas = document.getElementById('stat-novelas');
-    
+    // Tutorial
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialStartButton = document.getElementById('tutorial-start-button');
+    const tutorialCloseButton = document.getElementById('tutorial-close');
+    const tutorialDontShow = document.getElementById('tutorial-dont-show');
+    const helpButton = document.getElementById('help-button');
+
     // --- VARIÁVEIS DE ESTADO DO JOGO ---
     const nodesNaTela = new Set();
     const atorParaProducoes = new Map();
@@ -47,6 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let atorObjetivo1 = null;
     let atorObjetivo2 = null;
     let finalPath = [];
+    let selectedBox = null; // caixa atualmente selecionada
+    let highlightedSuggestionIndex = -1; // navegação por setas nas sugestões
+
+    // Configuração de distâncias para posicionamento relativo
+    const POS_CONFIG = {
+        // Distâncias preferidas para conexão (mais espaçado)
+        minLinkDistanceDesktop: 160,
+        minLinkDistanceMobile: 110,
+        maxLinkDistanceDesktop: 240,
+        maxLinkDistanceMobile: 160,
+        ringStepDesktop: 40,
+        ringStepMobile: 28,
+        // Ângulos (em graus) que vamos testar a partir da direção preferida
+        angleOffsetsDeg: [0, 12, -12, 24, -24, 36, -36, 48, -48],
+        // Distância mínima entre caixas
+        minBoxGap: 12
+    };
 
     // --- VARIÁVEIS PARA ZOOM E PAN ---
     let scale = 1;
@@ -57,7 +85,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let startPanY = 0;
     let initialPinchDistance = null;
 
+    // Mantém uma variável CSS com a altura da UI inferior (input + chips)
+    function setGameUiHeightVar() {
+        try {
+            const h = gameUiContainer ? gameUiContainer.offsetHeight : 0;
+            if (h > 0) {
+                document.documentElement.style.setProperty('--game-ui-height', `${h}px`);
+            }
+        } catch (_) { /* noop */ }
+    }
+
     function applyTransform() {
+        // Ordem: translate depois scale. As fórmulas de pan/zoom assumem esta ordem.
         viewport.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
     }
 
@@ -68,24 +107,69 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTransform();
     }
     
-    resetZoomButton.addEventListener('click', resetZoom);
+    resetZoomButton.addEventListener('click', () => {
+        resetZoom();
+        // limpa âncora de zoom
+        zoomAnchorX = null; zoomAnchorY = null;
+    });
+
+    // --- Tutorial (primeiro acesso) ---
+    const TUTORIAL_KEY = 'tutorial_optout_v1'; // marca "não mostrar novamente" (novo namespace)
+    function isOptedOut() {
+        try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch (_) { return false; }
+    }
+    function openTutorial() {
+        if (!tutorialOverlay) return;
+        tutorialOverlay.classList.remove('hidden');
+    }
+    function showTutorialIfFirstTime() {
+        if (!isOptedOut()) {
+            openTutorial();
+        }
+    }
+    function hideTutorial(setOptOut = false) {
+        if (!tutorialOverlay) return;
+        tutorialOverlay.classList.add('hidden');
+        if (setOptOut) {
+            try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (_) { /* ignore */ }
+        }
+    }
+    if (tutorialStartButton) tutorialStartButton.addEventListener('click', () => hideTutorial(!!(tutorialDontShow && tutorialDontShow.checked)));
+    if (tutorialCloseButton) tutorialCloseButton.addEventListener('click', () => hideTutorial(!!(tutorialDontShow && tutorialDontShow.checked)));
+    if (helpButton) helpButton.addEventListener('click', () => openTutorial());
+    if (tutorialOverlay) {
+        tutorialOverlay.addEventListener('click', (e) => {
+            if (e.target === tutorialOverlay) hideTutorial(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (!tutorialOverlay.classList.contains('hidden') && e.key === 'Escape') hideTutorial(false);
+        });
+    }
 
     // --- LÓGICA DE ZOOM (SCROLL DO RATO) ---
+    const isTutorialOpen = () => !!(tutorialOverlay && !tutorialOverlay.classList.contains('hidden'));
+    let zoomAnchorX = null, zoomAnchorY = null, zoomAnchorTimer = null;
     document.body.addEventListener('wheel', (e) => {
-        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        if (isTutorialOpen() || e.target.closest('#game-ui-container') || e.target.closest('.popup-content') || e.target.closest('.tutorial-content')) return;
         e.preventDefault();
         
         const zoomIntensity = 0.1;
         const delta = e.deltaY > 0 ? -1 : 1;
         const newScale = Math.max(0.3, Math.min(2, scale + delta * zoomIntensity));
-        const mouseX = e.clientX;
-        const mouseY = e.clientY;
+        // fixa o ponto âncora no início do gesto e mantém até encerrar
+        if (zoomAnchorX === null || zoomAnchorY === null) {
+            zoomAnchorX = e.clientX;
+            zoomAnchorY = e.clientY;
+        }
 
-        panX = mouseX - (mouseX - panX) * (newScale / scale);
-        panY = mouseY - (mouseY - panY) * (newScale / scale);
+        panX = zoomAnchorX - (zoomAnchorX - panX) * (newScale / scale);
+        panY = zoomAnchorY - (zoomAnchorY - panY) * (newScale / scale);
         
         scale = newScale;
         applyTransform();
+        // reseta âncora ao terminar o gesto (inatividade)
+        if (zoomAnchorTimer) clearTimeout(zoomAnchorTimer);
+        zoomAnchorTimer = setTimeout(() => { zoomAnchorX = null; zoomAnchorY = null; }, 250);
     }, { passive: false });
 
     // --- LÓGICA DE PAN (ARRASTAR O FUNDO) ---
@@ -111,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- LÓGICA DE ZOOM E PAN PARA MOBILE ---
     document.body.addEventListener('touchstart', (e) => {
-        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        if (isTutorialOpen() || e.target.closest('#game-ui-container') || e.target.closest('.popup-content') || e.target.closest('.tutorial-content')) return;
         
         if (e.touches.length === 1 && !e.target.closest('.box-nome')) {
             isPanning = true;
@@ -127,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     document.body.addEventListener('touchmove', (e) => {
-        if (e.target.closest('#game-ui-container') || e.target.closest('.popup-content')) return;
+        if (isTutorialOpen() || e.target.closest('#game-ui-container') || e.target.closest('.popup-content') || e.target.closest('.tutorial-content')) return;
         e.preventDefault();
 
         if (isPanning && e.touches.length === 1) {
@@ -177,6 +261,53 @@ document.addEventListener('DOMContentLoaded', () => {
             ...Array.from(todosOsNomes.producoes.values()).map(p => ({ nome: p.titulo, tipo: 'Produção' })),
             ...Array.from(atoresSet).map(a => ({ nome: a, tipo: 'Artista' }))
         ];
+    }
+
+    // Ajusta o tamanho da fonte dos nós conforme a quantidade na tela
+    function atualizarTamanhoFonteNos() {
+        const boxes = Array.from(document.querySelectorAll('.box-nome'));
+        const count = boxes.length;
+        const isMobile = window.innerWidth <= 768;
+        const base = isMobile ? 12 : 14;
+        let size = base;
+        // Começa a reduzir mais cedo para evitar poluição visual
+        if (count > 12 && count <= 20) size = base - 1;
+        else if (count > 20 && count <= 30) size = base - 2;
+        else if (count > 30 && count <= 45) size = base - 3;
+        else if (count > 45 && count <= 60) size = base - 4;
+        else if (count > 60) size = base - 5;
+        if (size < 10) size = 10;
+        boxes.forEach(box => {
+            const extra = box.classList.contains('box-ator-objetivo') ? 1 : 0;
+            box.style.fontSize = `${size + extra}px`;
+        });
+    }
+
+    function atualizarEstatisticasAoVivo() {
+        if (!liveArtistas || !liveFilmes || !liveSeries || !liveNovelas) return;
+        const contagem = { artistas: 0, filmes: 0, series: 0, novelas: 0 };
+        nodesNaTela.forEach(nome => {
+            const nomeLower = nome.toLowerCase();
+            if (todosOsNomes.atores.has(nomeLower)) {
+                contagem.artistas++;
+            } else if (todosOsNomes.producoes.has(nomeLower)) {
+                const tipo = todosOsNomes.producoes.get(nomeLower).tipo;
+                if (tipo === 'Filme') contagem.filmes++;
+                else if (tipo === 'Série') contagem.series++;
+                else if (tipo === 'Novela') contagem.novelas++;
+            }
+        });
+        liveArtistas.textContent = contagem.artistas;
+        liveFilmes.textContent = contagem.filmes;
+        liveSeries.textContent = contagem.series;
+        liveNovelas.textContent = contagem.novelas;
+        // Pode mudar a altura (quebra de linha dos chips)
+        requestAnimationFrame(setGameUiHeightVar);
+    }
+
+    function getHeaderHeight() {
+        const val = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height'));
+        return isNaN(val) ? 72 : val;
     }
 
     function verificarVitoria() {
@@ -240,6 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         victoryPopup.classList.remove('hidden');
         document.getElementById('input-wrapper').classList.add('hidden');
         showResultButton.classList.remove('hidden');
+        setTimeout(setGameUiHeightVar, 0);
     }
 
     function displayWinningPath(caminho) {
@@ -305,15 +437,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (nosPais.length > 0) {
             const pos = calcularPosicaoFilho(nosPais[0]);
             const tipo = eProducao ? 'producao' : 'ator';
-            const novoNo = criarNode(nomeCorreto, tipo, pos, null);
-            nosPais.forEach(noPai => {
-                criarLinha(novoNo, noPai);
-            });
-            resolverTodasAsColisoes();
-        } else {
-            feedbackInputInvalido("Válido, mas não conecta com ninguém!");
-        }
+        const novoNo = criarNode(nomeCorreto, tipo, pos, null);
+        // Reposiciona preferindo a frente; só cai para trás se necessário
+        posicionarNovoNoPreferencial(novoNo, nosPais[0]);
+        nosPais.forEach(noPai => {
+            criarLinha(novoNo, noPai);
+        });
+        resolverTodasAsColisoes();
+        atualizarTamanhoFonteNos();
+    } else {
+        feedbackInputInvalido("Válido, mas não conecta com ninguém!");
     }
+}
 
     function feedbackInputInvalido(mensagem = "Nome inválido!") {
         const placeholderOriginal = guessInput.placeholder;
@@ -336,6 +471,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     closeArtistInfoButton.addEventListener('click', () => {
         artistInfoPanel.classList.add('hidden');
+        if (selectedBox) selectedBox.classList.remove('selected');
+        selectedBox = null;
     });
     shareButton.addEventListener('click', () => {
         const numLinks = finalPath.length - 1;
@@ -355,6 +492,8 @@ document.addEventListener('DOMContentLoaded', () => {
     guessInput.addEventListener('input', mostrarSugestoes);
     guessInput.addEventListener('focus', () => {
         artistInfoPanel.classList.add('hidden');
+        if (selectedBox) selectedBox.classList.remove('selected');
+        selectedBox = null;
     });
     if (carouselPrev && carouselNext) {
         carouselPrev.addEventListener('click', slideAnterior);
@@ -362,30 +501,114 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.addEventListener('resize', atualizarCarousel);
     guessInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const primeiraSugestao = suggestionsContainer.querySelector('.suggestion-item');
-            if (primeiraSugestao) {
+        const itens = Array.from(suggestionsContainer.querySelectorAll('.suggestion-item'));
+        if (e.key === 'ArrowDown' && itens.length > 0) {
+            e.preventDefault();
+            highlightedSuggestionIndex = (highlightedSuggestionIndex + 1) % itens.length;
+            itens.forEach(el => el.classList.remove('active'));
+            itens[highlightedSuggestionIndex].classList.add('active');
+            itens[highlightedSuggestionIndex].scrollIntoView({ block: 'nearest' });
+            guessInput.value = itens[highlightedSuggestionIndex].dataset.nome;
+        } else if (e.key === 'ArrowUp' && itens.length > 0) {
+            e.preventDefault();
+            highlightedSuggestionIndex = (highlightedSuggestionIndex - 1 + itens.length) % itens.length;
+            itens.forEach(el => el.classList.remove('active'));
+            itens[highlightedSuggestionIndex].classList.add('active');
+            itens[highlightedSuggestionIndex].scrollIntoView({ block: 'nearest' });
+            guessInput.value = itens[highlightedSuggestionIndex].dataset.nome;
+        } else if (e.key === 'Enter') {
+            const ativa = highlightedSuggestionIndex >= 0 ? itens[highlightedSuggestionIndex] : itens[0];
+            if (ativa) {
                 e.preventDefault();
-                guessInput.value = primeiraSugestao.dataset.nome;
+                guessInput.value = ativa.dataset.nome;
                 suggestionsContainer.innerHTML = '';
             } else {
                 handleGuess();
             }
+        } else if (e.key === 'Escape') {
+            suggestionsContainer.innerHTML = '';
+            highlightedSuggestionIndex = -1;
         }
     });
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#game-ui-container')) {
             suggestionsContainer.innerHTML = '';
         }
-        if (window.innerWidth <= 768 && !artistInfoPanel.classList.contains('hidden')) {
-            const insidePanel = e.target.closest('#artist-info-panel');
-            const clickedNode = e.target.closest('.box-nome');
-            if (!insidePanel && !clickedNode) {
+        const insidePanel = e.target.closest('#artist-info-panel');
+        const clickedNode = e.target.closest('.box-nome');
+        // Em qualquer viewport, clique fora do painel e de um nó limpa seleção e esconde o painel (no mobile já fazia)
+        if (!insidePanel && !clickedNode) {
+            if (!artistInfoPanel.classList.contains('hidden')) {
                 artistInfoPanel.classList.add('hidden');
+            }
+            if (selectedBox) {
+                selectedBox.classList.remove('selected');
+                selectedBox = null;
             }
         }
     });
+
+    // Sinalizador visual de clique (onda/ripple)
+    function showClickIndicator(x, y) {
+        const dot = document.createElement('span');
+        dot.className = 'click-indicator';
+        dot.style.left = x + 'px';
+        dot.style.top = y + 'px';
+        document.body.appendChild(dot);
+        dot.addEventListener('animationend', () => dot.remove(), { once: true });
+    }
+    // Indicador para arraste
+    let dragIndicator = null;
+    let dragPointerId = null;
+    function showDragIndicator(x, y, pointerId) {
+        removeDragIndicator();
+        dragIndicator = document.createElement('span');
+        dragIndicator.className = 'drag-indicator';
+        dragIndicator.style.left = x + 'px';
+        dragIndicator.style.top = y + 'px';
+        document.body.appendChild(dragIndicator);
+        dragPointerId = pointerId;
+    }
+    function moveDragIndicator(x, y) {
+        if (!dragIndicator) return;
+        dragIndicator.style.left = x + 'px';
+        dragIndicator.style.top = y + 'px';
+    }
+    function removeDragIndicator() {
+        if (dragIndicator) {
+            dragIndicator.remove();
+            dragIndicator = null;
+            dragPointerId = null;
+        }
+    }
+    // Usa pointer* para cobrir mouse e toque sem duplicar eventos
+    document.addEventListener('pointerdown', (e) => {
+        // ignora botões não primários do mouse
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target.closest('.box-nome')) {
+            // Em arrastes: bolinha fixa até soltar
+            showDragIndicator(e.clientX, e.clientY, e.pointerId);
+        } else {
+            showClickIndicator(e.clientX, e.clientY);
+        }
+    });
+    document.addEventListener('pointermove', (e) => {
+        if (dragIndicator && e.pointerId === dragPointerId) {
+            moveDragIndicator(e.clientX, e.clientY);
+        }
+    });
+    document.addEventListener('pointerup', (e) => {
+        if (dragIndicator && e.pointerId === dragPointerId) {
+            removeDragIndicator();
+        }
+    });
+    document.addEventListener('pointercancel', (e) => {
+        if (dragIndicator && e.pointerId === dragPointerId) {
+            removeDragIndicator();
+        }
+    });
     document.addEventListener('keydown', (e) => {
+        if (isTutorialOpen()) return;
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && document.activeElement !== guessInput) {
             guessInput.focus();
         }
@@ -419,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
             criarLinha(box, noPai);
         }
         atualizarAreaTrabalho();
+        atualizarEstatisticasAoVivo();
         return box;
     }
 
@@ -432,12 +656,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } while (ator1Index === ator2Index);
         atorObjetivo1 = todosOsAtores[ator1Index];
         atorObjetivo2 = todosOsAtores[ator2Index];
+        if (pageSubtitle) {
+            // Monta o subtítulo destacando os nomes dos artistas
+            pageSubtitle.innerHTML = '';
+            const artist1 = document.createElement('span');
+            artist1.className = 'artist-name';
+            artist1.textContent = atorObjetivo1;
+            const artist2 = document.createElement('span');
+            artist2.className = 'artist-name';
+            artist2.textContent = atorObjetivo2;
+            pageSubtitle.append('Conecte ', artist1, ' com ', artist2);
+        }
         let pos1, pos2;
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
+            const safeTop = getHeaderHeight() + 60; // abaixo do título/linha/botão
             pos1 = { 
                 x: window.innerWidth / 2,
-                y: window.innerHeight * 0.1
+                y: safeTop
             };
             pos2 = { 
                 x: window.innerWidth / 2,
@@ -466,6 +702,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (no1) no1.classList.add('box-ator-objetivo');
         if (no2) no2.classList.add('box-ator-objetivo');
+        atualizarEstatisticasAoVivo();
+        atualizarTamanhoFonteNos();
     }
 
     function criarLinha(boxA, boxB, extra = false) {
@@ -486,9 +724,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function mostrarSugestoes() {
         const textoInput = guessInput.value.trim().toLowerCase();
         suggestionsContainer.innerHTML = '';
+        highlightedSuggestionIndex = -1;
         if (textoInput.length < 2) return;
-        const sugestoesFiltradas = todosOsNomesArray.filter(item => item.nome.toLowerCase().startsWith(textoInput)).slice(0, 10);
-        sugestoesFiltradas.forEach(item => {
+        const sugestoesFiltradas = todosOsNomesArray
+            .filter(item => item.nome.toLowerCase().startsWith(textoInput))
+            .slice(0, 10);
+        sugestoesFiltradas.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'suggestion-item';
             div.innerHTML = `${item.nome} <small>${item.tipo}</small>`;
@@ -497,6 +738,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 guessInput.value = item.nome;
                 suggestionsContainer.innerHTML = '';
                 guessInput.focus();
+            });
+            div.addEventListener('mouseenter', () => {
+                highlightedSuggestionIndex = idx;
+                suggestionsContainer.querySelectorAll('.suggestion-item').forEach(el => el.classList.remove('active'));
+                div.classList.add('active');
             });
             suggestionsContainer.appendChild(div);
         });
@@ -507,6 +753,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ? elementoAtivo
             : (e.target && e.target.closest ? e.target.closest('.box-nome') : null);
         if (!boxClicado || !boxClicado.dataset.nome) return;
+        // marca seleção visual
+        if (selectedBox && selectedBox !== boxClicado) {
+            selectedBox.classList.remove('selected');
+        }
+        selectedBox = boxClicado;
+        selectedBox.classList.add('selected');
         const tipo = boxClicado.dataset.tipo;
         if (tipo === 'ator') {
             mostrarInfoArtista(boxClicado.dataset.nome);
@@ -601,8 +853,12 @@ document.addEventListener('DOMContentLoaded', () => {
             img.alt = producao.titulo;
             const titulo = document.createElement('h4');
             titulo.textContent = producao.titulo;
+            const hint = document.createElement('span');
+            hint.className = 'watch-tap-hint';
+            hint.textContent = 'Toque/Clique para assistir';
             card.appendChild(img);
             card.appendChild(titulo);
+            card.appendChild(hint);
             card.addEventListener('click', () => {
                 window.open(producao.link, '_blank', 'noopener');
             });
@@ -645,23 +901,135 @@ document.addEventListener('DOMContentLoaded', () => {
         irParaSlide(carouselIndex - 1);
     }
 
+    // Suporte a swipe no carrossel (mobile)
+    (function enableCarouselSwipe() {
+        if (!watchCarousel) return;
+        let startX = 0, startY = 0, deltaX = 0, deltaY = 0, touching = false, swiping = false;
+        const threshold = 40; // px mínimos para trocar
+        const lockAngle = 12; // graus ~ prioridade horizontal
+        function onStart(x, y) { startX = x; startY = y; deltaX = 0; deltaY = 0; touching = true; swiping = false; }
+        function onMove(x, y, e) {
+            if (!touching) return;
+            deltaX = x - startX; deltaY = y - startY;
+            if (!swiping) {
+                // Decide direção: se horizontal bem maior que vertical, ativamos swipe e previnimos scroll
+                if (Math.abs(deltaX) > Math.tan(lockAngle * Math.PI/180) * Math.abs(deltaY)) {
+                    swiping = true;
+                }
+            }
+            if (swiping && e && e.cancelable) e.preventDefault();
+        }
+        function onEnd() {
+            if (!touching) return;
+            touching = false;
+            if (swiping && Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX < 0) proximoSlide(); else slideAnterior();
+            }
+        }
+        watchCarousel.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return; 
+            const t = e.touches[0];
+            onStart(t.clientX, t.clientY);
+        }, { passive: true });
+        watchCarousel.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 1) return;
+            const t = e.touches[0];
+            onMove(t.clientX, t.clientY, e);
+        }, { passive: false });
+        watchCarousel.addEventListener('touchend', onEnd, { passive: true });
+        watchCarousel.addEventListener('touchcancel', () => { touching = false; swiping = false; }, { passive: true });
+    })();
+
     function calcularPosicaoFilho(noPai) {
         const isMobile = window.innerWidth <= 768;
-        let angulo;
-        if (isMobile) {
-            if (noPai.offsetTop < window.innerHeight / 2) {
-                angulo = Math.random() * Math.PI;
-            } else {
-                angulo = Math.PI + Math.random() * Math.PI;
-            }
-        } else {
-            angulo = Math.random() * 2 * Math.PI;
-        }
-        const distanciaBase = isMobile ? 80 : 150;
-        const distancia = distanciaBase + Math.random() * 40;
+        // Usa coordenadas na tela para decidir esquerda/direita, respeitando pan/zoom
+        const rect = noPai.getBoundingClientRect();
+        const parentCenterX = rect.left + rect.width / 2;
+        const parentCenterY = rect.top + rect.height / 2;
+
+        // Se o pai está na metade esquerda da tela, posiciona o filho à direita; senão, à esquerda
+        const biasParaDireita = parentCenterX < window.innerWidth / 2;
+
+        // Base do ângulo horizontal e variação para evitar sobreposição
+        const spread = Math.PI / 6; // ±30°
+        let anguloBase = biasParaDireita ? 0 : Math.PI; // 0° (direita) ou 180° (esquerda)
+        let jitter = (Math.random() - 0.5) * spread;
+
+        // Tendência vertical para evitar acumular muito acima/abaixo
+        const viésVertical = (parentCenterY < window.innerHeight / 2 ? 1 : -1) * (spread / 2);
+        const angulo = anguloBase + jitter + viésVertical;
+
+        const distanciaBase = isMobile ? POS_CONFIG.minLinkDistanceMobile : POS_CONFIG.minLinkDistanceDesktop;
+        const randomExtra = isMobile ? Math.random() * 30 : Math.random() * 60;
+        const maxDist = isMobile ? POS_CONFIG.maxLinkDistanceMobile : POS_CONFIG.maxLinkDistanceDesktop;
+        let distancia = distanciaBase + randomExtra;
+        distancia = Math.min(distancia, maxDist);
         const x = noPai.offsetLeft + Math.cos(angulo) * distancia;
         const y = noPai.offsetTop + Math.sin(angulo) * distancia;
         return { x, y };
+    }
+
+    // Procura posição livre, preferindo a "frente" do nó pai; só usa o lado de trás se necessário
+    function posicionarNovoNoPreferencial(novoNo, noPai) {
+        if (!novoNo || !noPai) return;
+        const isMobile = window.innerWidth <= 768;
+        const gap = POS_CONFIG.minBoxGap || 0;
+        const anglesDeg = POS_CONFIG.angleOffsetsDeg || [0];
+        const minDist = isMobile ? POS_CONFIG.minLinkDistanceMobile : POS_CONFIG.minLinkDistanceDesktop;
+        const maxDist = isMobile ? POS_CONFIG.maxLinkDistanceMobile : POS_CONFIG.maxLinkDistanceDesktop;
+        const step = isMobile ? POS_CONFIG.ringStepMobile : POS_CONFIG.ringStepDesktop;
+
+        // Centro do pai em coordenadas do container
+        const parentCx = noPai.offsetLeft + noPai.offsetWidth / 2;
+        const parentCy = noPai.offsetTop + noPai.offsetHeight / 2;
+
+        // Direção preferida (frente)
+        const rect = noPai.getBoundingClientRect();
+        const biasParaDireita = rect.left + rect.width / 2 < window.innerWidth / 2;
+        const baseAngles = [biasParaDireita ? 0 : Math.PI, biasParaDireita ? Math.PI : 0]; // frente, depois atrás
+
+        // Retângulos existentes (em coords do container)
+        const existentes = Array.from(document.querySelectorAll('.box-nome'))
+            .filter(box => box !== novoNo)
+            .map(box => ({
+                left: box.offsetLeft,
+                top: box.offsetTop,
+                right: box.offsetLeft + box.offsetWidth,
+                bottom: box.offsetTop + box.offsetHeight
+            }));
+
+        function livre(cLeft, cTop, w, h) {
+            const left = cLeft - gap / 2, top = cTop - gap / 2;
+            const right = cLeft + w + gap / 2, bottom = cTop + h + gap / 2;
+            for (const r of existentes) {
+                if (left < r.right && right > r.left && top < r.bottom && bottom > r.top) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Tenta frente primeiro, depois atrás
+        const w = novoNo.offsetWidth;
+        const h = novoNo.offsetHeight;
+        for (const base of baseAngles) {
+            for (let dist = minDist; dist <= maxDist; dist += step) {
+                // Testa ângulos simétricos em torno da direção base
+                for (const offDeg of anglesDeg) {
+                    const ang = base + (offDeg * Math.PI / 180);
+                    const cx = parentCx + Math.cos(ang) * dist;
+                    const cy = parentCy + Math.sin(ang) * dist;
+                    const left = Math.round(cx - w / 2);
+                    const top = Math.round(cy - h / 2);
+                    if (livre(left, top, w, h)) {
+                        novoNo.style.left = `${left}px`;
+                        novoNo.style.top = `${top}px`;
+                        return; // posicionou
+                    }
+                }
+            }
+        }
+        // Se tudo falhar, mantém posição atual; colisões serão resolvidas depois
     }
 
     let elementoAtivo = null, offsetX = 0, offsetY = 0, isDragging = false, startX, startY;
@@ -691,6 +1059,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function iniciarArraste(e) {
         elementoAtivo = e.currentTarget;
         isDragging = false;
+        // marca como selecionado ao começar a interagir
+        if (selectedBox && selectedBox !== elementoAtivo) {
+            selectedBox.classList.remove('selected');
+        }
+        selectedBox = elementoAtivo;
+        selectedBox.classList.add('selected');
         const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
         const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
         startX = clientX;
@@ -756,9 +1130,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const rectB = boxB.getBoundingClientRect();
                     const lockedA = boxA.dataset.locked === 'true';
                     const lockedB = boxB.dataset.locked === 'true';
-                    if (rectA.left < rectB.right && rectA.right > rectB.left && rectA.top < rectB.bottom && rectA.bottom > rectB.top) {
-                        const overlapX = Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left);
-                        const overlapY = Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top);
+                    const gap = POS_CONFIG.minBoxGap || 0;
+                    // Inflamos os retângulos pela metade do gap para considerar "muito perto" como colisão
+                    const aL = rectA.left - gap / 2, aR = rectA.right + gap / 2, aT = rectA.top - gap / 2, aB = rectA.bottom + gap / 2;
+                    const bL = rectB.left - gap / 2, bR = rectB.right + gap / 2, bT = rectB.top - gap / 2, bB = rectB.bottom + gap / 2;
+                    if (aL < bR && aR > bL && aT < bB && aB > bT) {
+                        const overlapX = Math.min(aR, bR) - Math.max(aL, bL);
+                        const overlapY = Math.min(aB, bB) - Math.max(aT, bT);
                         const centroA_X = rectA.left + rectA.width / 2;
                         const centroB_X = rectB.left + rectB.width / 2;
                         const centroA_Y = rectA.top + rectA.height / 2;
@@ -830,9 +1208,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let shiftX = 0;
         let shiftY = 0;
-        const limiteMinimo = 50;
-        if (minX < limiteMinimo) shiftX = limiteMinimo - minX;
-        if (minY < limiteMinimo) shiftY = limiteMinimo - minY;
+        const isMobile = window.innerWidth <= 768;
+        const limiteMinimoX = 50;
+        const limiteMinimoY = isMobile ? getHeaderHeight() + 60 : 50; // evita sobrepor o título no mobile
+        if (minX < limiteMinimoX) shiftX = limiteMinimoX - minX;
+        if (minY < limiteMinimoY) shiftY = limiteMinimoY - minY;
         if (shiftX !== 0 || shiftY !== 0) {
             boxes.forEach(box => {
                 box.style.left = `${box.offsetLeft + shiftX}px`;
@@ -852,4 +1232,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     iniciarTela();
+    showTutorialIfFirstTime();
+
+    // Ajusta spacing do painel informativo em relação à UI inferior
+    setGameUiHeightVar();
+    window.addEventListener('resize', setGameUiHeightVar);
+    // Em alguns dispositivos móveis, o resize pode ocorrer após fontes/carregamentos
+    window.addEventListener('load', setGameUiHeightVar);
+    if (window.ResizeObserver && gameUiContainer) {
+        const ro = new ResizeObserver(() => setGameUiHeightVar());
+        ro.observe(gameUiContainer);
+    }
+
+    // Recalcula tamanhos ao vivo quando a janela muda
+    window.addEventListener('resize', atualizarTamanhoFonteNos);
 });

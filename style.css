@@ -33,6 +33,53 @@ body, html {
     -moz-osx-font-smoothing: grayscale;
 }
 
+:root {
+    --header-height: 72px;
+    /* Altura dinâmica da UI inferior (input + chips). Atualizada via JS */
+    --game-ui-height: 120px;
+}
+
+/* --- TOPO DA UI (Título + linha fina) --- */
+#top-ui {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--header-height);
+    border-bottom: 1px solid #d0d0d0; /* linha fina visível */
+    z-index: 1400; /* abaixo de 1500+ para não cobrir botões/painéis */
+    background: transparent; /* sem fundo próprio */
+    padding-bottom: 1%;
+}
+#top-ui .top-ui-inner {
+    display: flex;
+    flex-direction: column; /* empilha título e subtítulo */
+    align-items: center;
+    justify-content: center; /* centraliza vertical/horizontal */
+    gap: 4px;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+}
+#top-ui .page-title {
+    margin: 1% 0 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #222;
+    text-align: center;
+}
+#top-ui .page-subtitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 400;
+    color: #666;
+    text-align: center;
+}
+#top-ui .page-subtitle .artist-name {
+    color: #FF6700;
+    font-weight: 700;
+}
+
 /* --- ESTILOS PARA O VIEWPORT E ZOOM --- */
 #viewport {
     width: 100%;
@@ -42,6 +89,7 @@ body, html {
     left: 0;
     cursor: grab;
     transition: transform 0.1s ease-out;
+    transform-origin: 0 0; /* garante âncora correta do zoom */
 }
 body.panning, body.panning #viewport {
     cursor: grabbing;
@@ -61,8 +109,8 @@ body.panning, body.panning #viewport {
 
 #reset-zoom-button {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: calc((var(--header-height) - 40px) / 2); /* alinhado ao cabeçalho */
+    right: 16px; /* alinha com padding do cabeçalho */
     z-index: 1500;
     background-color: rgba(255, 255, 255, 0.8);
     border: 1px solid #ccc;
@@ -80,12 +128,33 @@ body.panning, body.panning #viewport {
     height: 20px;
 }
 
+/* Botão de ajuda (Como jogar) */
+#help-button {
+    position: fixed;
+    top: calc((var(--header-height) - 40px) / 2);
+    left: 16px; /* move para a esquerda */
+    right: auto;
+    z-index: 1500;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid #ccc;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+#help-button svg { width: 20px; height: 20px; }
+
 #artist-info-panel {
     position: fixed;
-    top: 20px;
+    top: 50%;
     left: 20px;
-    width: 280px;
-    max-width: 85vw;
+    transform: translateY(-50%);
+    width: 320px;
+    max-width: 90vw;
     max-height: 70vh;
     padding: 16px;
     background-color: rgba(255, 255, 255, 0.95);
@@ -233,6 +302,9 @@ body.panning, body.panning #viewport {
 .suggestion-item:hover {
     background-color: #f2f2f2;
 }
+.suggestion-item.active {
+    background-color: #e9f3ff;
+}
 .suggestion-item small {
     color: #888;
     margin-left: 8px;
@@ -251,6 +323,91 @@ body.panning, body.panning #viewport {
     z-index: 3000;
     opacity: 1;
     transition: opacity 0.3s ease-in-out;
+}
+
+/* ---- Tutorial inicial ---- */
+#tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3500;
+}
+#tutorial-overlay.hidden { display: none !important; }
+
+.tutorial-content {
+    background: #1f2430;
+    color: #f5f7fa;
+    padding: 24px 24px 20px 24px;
+    border-radius: 16px;
+    width: 92%;
+    max-width: 560px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+    position: relative;
+}
+.tutorial-content h2 {
+    margin: 0 0 8px 0;
+    font-size: 26px;
+    text-align: center;
+}
+.tutorial-steps { margin-top: 6px; }
+.tutorial-step {
+    text-align: center;
+    padding: 12px 6px;
+}
+.tutorial-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+.tutorial-step h3 {
+    margin: 6px 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #b8c0cc;
+    text-transform: uppercase;
+}
+.tutorial-step p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+}
+.tutorial-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+}
+.tutorial-optout {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #d6dde8;
+}
+.tutorial-start {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 999px;
+    background-color: #FF6700;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Globotipo', sans-serif;
+}
+.tutorial-start:hover { background-color: #E65C00; }
+
+@media (max-width: 768px) {
+    .tutorial-content { 
+        width: calc(100% - 24px);
+        margin: 0 12px;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
 }
 #victory-popup.hidden {
     opacity: 0;
@@ -350,6 +507,7 @@ body.panning, body.panning #viewport {
     min-width: 100%;
     height: 100%;
     box-sizing: border-box;
+    cursor: pointer; /* deixa claro que é clicável */
 }
 .watch-card img {
     width: 100%;
@@ -370,6 +528,31 @@ body.panning, body.panning #viewport {
     text-shadow: 0 2px 8px rgba(0,0,0,0.6);
     background: linear-gradient(transparent, rgba(0,0,0,0.6));
     border-radius: 6px;
+}
+.watch-tap-hint {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255,103,0,0.95);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none; /* não bloqueia cliques no card */
+    animation: hint-pulse 2.2s ease-in-out infinite;
+}
+.watch-tap-hint::before {
+    content: '▶';
+    display: inline-block;
+}
+@keyframes hint-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.95; }
+    50% { transform: scale(1.06); opacity: 1; }
 }
 .carousel-controls {
     position: absolute;
@@ -444,6 +627,39 @@ body.panning, body.panning #viewport {
 .hidden {
     display: none !important;
 }
+#click-indicator-layer,
+.click-indicator {
+    pointer-events: none;
+}
+.click-indicator {
+    position: fixed;
+    left: 0; top: 0;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 103, 0, 0.18);
+    border: 2px solid #FF6700;
+    transform: translate(-50%, -50%) scale(0.2);
+    z-index: 5000;
+    animation: click-ripple 0.6s ease-out forwards;
+}
+@keyframes click-ripple {
+    0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.2); }
+    70% { opacity: 0.25; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
+}
+
+/* Indicador persistente durante arraste */
+.drag-indicator {
+    position: fixed;
+    left: 0; top: 0;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #FF6700;
+    box-shadow: 0 0 0 3px rgba(255,103,0,0.25);
+    transform: translate(-50%, -50%);
+    z-index: 5001;
+    pointer-events: none;
+}
 #show-result-button {
     padding: 10px 20px;
     border: none;
@@ -458,6 +674,33 @@ body.panning, body.panning #viewport {
 }
 #show-result-button:hover {
     background-color: #E65C00;
+}
+
+/* --- Barra de estatísticas ao fundo --- */
+#bottom-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    color: #333;
+}
+#bottom-stats .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background-color: #f7f7f7;
+    border: 1px solid #e4e4e4;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 14px;
+}
+#bottom-stats .stat-chip span {
+    font-weight: 700;
+}
+#bottom-stats .stat-chip label {
+    color: #666;
 }
 .box-nome {
     position: absolute; 
@@ -493,12 +736,17 @@ body.panning, body.panning #viewport {
 }
 .box-nome.arrastando {
     cursor: grabbing; z-index: 1000;
-    box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 12px rgba(0,0,0,0.2), 0 0 0 3px rgba(255,103,0,0.25);
     transform: scale(1.05);
+    border-color: #FF6700;
 }
 #container-linhas line.winning-path {
     stroke: #FF6700;
     stroke-width: 5;
+}
+.box-nome.selected {
+    border-color: #FF6700;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15), 0 0 0 3px rgba(255,103,0,0.25);
 }
 .shake {
     animation: shake 0.5s;
@@ -509,17 +757,47 @@ body.panning, body.panning #viewport {
     75% { transform: translateX(5px); }
 }
 @media (max-width: 768px) {
+    /* Centraliza linha fina sob o título apenas no mobile */
+    #top-ui { 
+        border-bottom: none; /* remove a linha na largura total */
+    }
+    #top-ui .top-ui-inner { 
+        padding-top: 8px; 
+        padding-bottom: 10px; 
+    }
+    #top-ui .page-subtitle { 
+        position: relative; 
+        padding-bottom: 8px; 
+    }
+    #top-ui .page-title::after { content: none; }
+    #top-ui .page-subtitle::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 0;
+        width: 140px; /* largura da linha no mobile */
+        height: 1px;
+        background-color: #d0d0d0; /* mesma cor da linha fina */
+    }
     #reset-zoom-button {
-        top: 15px;
+        top: calc(var(--header-height) + 8px); /* abaixo do título + linha */
         right: 15px;
+    }
+    #help-button {
+        top: calc(var(--header-height) + 8px);
+        left: 15px; /* alinhado à esquerda no mobile também */
+        right: auto;
     }
     #artist-info-panel {
         top: auto;
-        bottom: 100px;
+        /* Mantém o painel acima da UI de input no mobile e respeita safe area */
+        bottom: calc(var(--game-ui-height) + max(16px, env(safe-area-inset-bottom)));
         left: 50%;
         transform: translateX(-50%);
         width: calc(100% - 40px);
-        max-height: 40vh;
+        /* Altura máxima dinâmica entre topo (header) e base (UI inferior) */
+        max-height: calc(100vh - var(--header-height) - var(--game-ui-height) - 32px);
     }
     #input-wrapper {
         padding: 2px 5px 2px 15px;
